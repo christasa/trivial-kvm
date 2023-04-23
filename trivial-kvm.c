@@ -67,22 +67,69 @@ int kvm_cpu__start(struct kvm_cpu *cpu) {
     return err;
 }
 
+void kvm__arch_init(struct kvm *kvm) {
+
+    kvm->ram_slots = 0;
+    kvm->ram_size = 1024*1024; // memory size: 1GB
+    struct kvm_pit_config pit_config = {
+        .flags = 0,
+    };
+    int ret;
+
+    ret = ioctl(kvm->vm_fd, KVM_SET_TSS_ADDR, 0xfffbd000);
+    if (ret < 0)
+        perror("KVM_SET_TSS_ADDR ioctl");
+
+    ret = ioctl(kvm->vm_fd, KVM_CREATE_PIT2, &pit_config);
+    if (ret < 0)
+        perror("KVM_CREATE_PIT2 ioctl");
+    
+    kvm->ram_pagesize = 4096;  // set the default page size as 4KB
+    kvm->ram_start = mmap(NULL, kvm->ram_size, 
+    PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+
+    if (kvm->ram_size >= KVM_32BIT_GAP_START) {
+        kvm->ram_size = kvm->ram_size + KVM_32BIT_GAP_SIZE;
+        // if ram size is bigger than the 32bit RAM, then mprotect the gap PROT_NONE
+        // so that we will konw if the programme accidently writes to this address
+        if (kvm->ram_start != MAP_FAILED) 
+            mprotect(kvm->ram_start + KVM_32BIT_GAP_START, KVM_32BIT_GAP_START, PROT_NONE);
+    }
+
+    if (kvm->ram_start == MAP_FAILED)
+        perror("out of memory");
+    
+    ret = ioctl(kvm->vm_fd, KVM_CREATE_IRQCHIP);
+	if (ret < 0)
+		perror("KVM_CREATE_IRQCHIP ioctl");
+
+}
+
+void kvm__init_page(struct kvm *kvm) {
+    u64 phys_start, phys_size;
+	void *host_mem;
+
+    if (kvm->ram_size < KVM_32BIT_GAP_START) {
+        // 1GB is smaller than the KVM_32BIT_GAP_START
+        phys_start = 0;
+        phys_size = kvm->ram_size;
+        host_mem = kvm->ram_start;
+
+
+    }
+    else {
+
+    }
+}
 
 int kvm_ram__init(struct kvm *kvm) {
     int ret = 0;
 
     struct kvm_userspace_memory_region mem;
 
-    kvm->ram_slots = 0;
-    kvm->ram_size = 1024*1024; // memory size: 1GB
-    kvm->ram_start = mmap(NULL, kvm->ram_size, 
-    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+    // get the address of ram start
+    kvm__arch_init(kvm);
 
-    if (kvm->ram_start == MAP_FAILED) {
-        perror("KVM MEMORY MAP");
-        
-        return ret;
-    }
 
     mem = (struct kvm_userspace_memory_region){
         .slot = kvm->ram_slots,

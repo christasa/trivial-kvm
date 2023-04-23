@@ -10,7 +10,7 @@ Learning of tkvm can be divided into 4 steps:
 
 ## Example
 Run the `tkvm` and then run the command
-> pidstat -p `pidof tkvm` 1
+> `` pidstat -p `pidof tkvm` 1 ``
 
 you will see the following output
 
