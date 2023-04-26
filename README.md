@@ -4,7 +4,7 @@ tkvm is a minimal VMM which can run a very simple VM and can run a whole operati
 ## Steps
 Learning of tkvm can be divided into 4 steps:
 - [x] Build a prototype of KVM API usage
-- [ ] Accomplish the part of Memory set
+- [x] Accomplish the part of Memory set
 - [ ] Accomplish the part of load kernel boot and initrd
 - [ ] Accomplish the part of CPU
 

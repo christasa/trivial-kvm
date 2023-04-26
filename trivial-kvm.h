@@ -5,12 +5,10 @@
 #define KVM_32BIT_GAP_SIZE (768 << 20)
 #define KVM_32BIT_GAP_START (KVM_32BIT_MAX_MEM_SIZE - KVM_32BIT_GAP_SIZE)
 
-
 typedef unsigned char  u8;
 typedef unsigned short u16;
 typedef unsigned int   u32;
 typedef unsigned long long u64;
-
 
 struct kvm {
     int sys_fd;      /* For system ioctls(), i.e. /dev/kvm */
@@ -20,13 +18,13 @@ struct kvm {
     u64 ram_size;		/* Guest memory size, in bytes */
     void *ram_start;
     u64 ram_pagesize;
+    pthread_mutex_t mutex;
 
     int nrcpus; /* Number of cpus to run */
     struct kvm_cpu **cpus;
 
     u32 mem_slots; /* for KVM_SET_USER_MEMORY_REGION */
     
-
 };
 
 struct kvm_cpu {
@@ -39,4 +37,3 @@ struct kvm_cpu {
     struct kvm_run		*kvm_run;
 
 };
-

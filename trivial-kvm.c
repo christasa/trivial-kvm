@@ -105,47 +105,45 @@ void kvm__arch_init(struct kvm *kvm) {
 
 }
 
-void kvm__init_page(struct kvm *kvm) {
-    u64 phys_start, phys_size;
-	void *host_mem;
+int kvm_ram__init(struct kvm *kvm) {
+    struct kvm_userspace_memory_region mem;
+    int ret = 0;
+
+    // get the address of ram start
+    kvm__arch_init(kvm);
+
+    // lock each CPU thread
+    if (pthread_mutex_lock(&kvm->mutex) != 0) {
+        perror("unexpected pthread_mutex_init() failure!");
+    }
 
     if (kvm->ram_size < KVM_32BIT_GAP_START) {
         // 1GB is smaller than the KVM_32BIT_GAP_START
-        phys_start = 0;
-        phys_size = kvm->ram_size;
-        host_mem = kvm->ram_start;
 
+        mem = (struct kvm_userspace_memory_region) {
+            .slot = 0,
+            .flags = 0,
+            .guest_phys_addr = 0,
+            .memory_size = kvm->ram_size,
+            .userspace_addr = (unsigned long)kvm->ram_start,
+        };
+
+        ret = ioctl(kvm->vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);
+        if (ret < 0) {
+            perror("KVM_SET_USER_MEMORY_REGION ioctl");
+            goto out;
+        }
+
+        ret = 0;
 
     }
     else {
 
     }
-}
 
-int kvm_ram__init(struct kvm *kvm) {
-    int ret = 0;
-
-    struct kvm_userspace_memory_region mem;
-
-    // get the address of ram start
-    kvm__arch_init(kvm);
-
-
-    mem = (struct kvm_userspace_memory_region){
-        .slot = kvm->ram_slots,
-        .flags = 0,
-        .guest_phys_addr = 0,  /* Memory begins at 0KB of Physical Memory*/
-        .memory_size = kvm->ram_size,
-        .userspace_addr = (unsigned long)kvm->ram_start,
-    };
-
-    ret = ioctl(kvm->vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);
-    if (ret < 0) {
-        perror("KVM_SET_USER_MEMORY_REGION ioctl");
-
-        return ret;
-    }
-
+out:
+    if (pthread_mutex_unlock(&kvm->mutex) != 0) 
+        perror("unexpected pthread_mutex_unlock() failure!");
 
     return ret;
 }
