@@ -25,6 +25,10 @@ you will see the following output
 
 We simply ran an empty loop in the Guest, which can see in the [guest/kernel.S](guest/kernel.S), and it can be observed that the VCPU's Guest state is 100%, even when there are passive VM exits such as clock interrupt or network card interrupt landing on this CPU. After the VM exit, the VCPU stays in Host kernel state for a very short period of time before immediately switching back to the Guest. Therefore, the %system state in the statistics is 0.
 
+## Relevant notes
+- [kvmtool阅读笔记(一) | 通用结构体&函数执行概括](https://christa.top/details/62/)
+- [kvmtool阅读笔记(二) | 内存初始化](https://christa.top/details/63/)
+
 ## Reference
 - [https://github.com/kvmtool/kvmtool](https://github.com/kvmtool/kvmtool)
 - *Inside the Linux Virtualization Principle and Implementation*
