@@ -1,15 +1,17 @@
 CC := gcc
+
 CFLAGS := -w -pthread
 
 OBJ += trivial-kvm.c
-OBJ += trivial-kvm.h
+
+INCLUDE := include
 
 PROGRAM := tkvm
 
 all: $(PROGRAM)
 
 $(PROGRAM): $(OBJ)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) -I$(INCLUDE) $(CFLAGS) $^ -o $@
 
 .PHONY: clean
 clean:
