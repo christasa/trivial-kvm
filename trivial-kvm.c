@@ -380,6 +380,124 @@ int kvm__load_kernel(struct kvm *kvm, const char *kernel_filename,
     return ret;
 }
 
+static void e820_setup(struct kvm *kvm) {
+    struct e820map *e820;
+	struct e820entry *mem_map;
+	unsigned int i = 0;
+
+    e820 = guest_flat_to_host(kvm, 0x0009fc00);
+    mem_map = e820->map;
+
+    mem_map[i++]	= (struct e820entry) {
+		.addr		= 0x00000000,
+		.size		= 0x0009fc00,
+		.type		= 1,
+	};
+	mem_map[i++]	= (struct e820entry) {
+		.addr		= 0x0009fc00,
+		.size		= 0x00000400,
+		.type		= 2,
+	};
+	mem_map[i++]	= (struct e820entry) {
+		.addr		= 0x000f0000,
+		.size		= 0x0000ffff,
+		.type		= 2,
+	};
+    
+    if (kvm->ram_size < KVM_32BIT_GAP_START) {
+		mem_map[i++]	= (struct e820entry) {
+			.addr		= 0x100000UL,
+			.size		= kvm->ram_size - 0x100000UL,
+			.type		= 1,
+		};
+	} else {
+		mem_map[i++]	= (struct e820entry) {
+			.addr		= 0x100000UL,
+			.size		= KVM_32BIT_GAP_START - 0x100000UL,
+			.type		= 1,
+		};
+		mem_map[i++]	= (struct e820entry) {
+			.addr		= KVM_32BIT_MAX_MEM_SIZE,
+			.size		= kvm->ram_size - KVM_32BIT_MAX_MEM_SIZE,
+			.type		= 1,
+		};
+	}
+
+    if (i > 128)
+        perror("BUG too big");
+    
+    e820->nr_map = i;
+
+}
+
+static void setup_vga_rom(struct kvm *kvm) {
+    u16 *mode;
+    void *p;
+
+    p = guest_flat_to_host(kvm, 0x000c0000);
+    memset(p, 0, 16);
+    strncpy(p, "KVM VESA", 16);
+
+    mode = guest_flat_to_host(kvm, 0x000c0000 + 16);
+    mode[0] = 0x0112;
+    mode[1] = 0xffff;
+}
+
+void interrupt_table__setup(struct interrupt_table *itable, struct real_intr_desc *entry) {
+	unsigned int i;
+
+	for (i = 0; i < 256; i++)
+		itable->entries[i] = *entry;
+}
+
+void interrupt_table__copy(struct interrupt_table *itable, void *dst, unsigned int size)
+{
+	if (size < sizeof(itable->entries))
+		perror("An attempt to overwrite host memory");
+
+	memcpy(dst, itable->entries, sizeof(itable->entries));
+}
+
+int kvm__arch_setup_firmware(struct kvm *kvm) {
+    int ret = 0;
+    unsigned long address = 0x000f0000;
+    struct real_intr_desc intr_desc;
+    unsigned int i;
+	void *p;
+
+    p = guest_flat_to_host(kvm, 0x00000400);
+	memset(p, 0, 0x000000ff);
+
+	p = guest_flat_to_host(kvm, 0x0009fc00);
+	memset(p, 0, 0x000003ff);
+
+	p = guest_flat_to_host(kvm, 0x000f0000);
+	memset(p, 0, 0x0000ffff);
+
+	p = guest_flat_to_host(kvm, 0x000c0000);
+	memset(p, 0, 0x00007fff);
+
+	p = guest_flat_to_host(kvm, 0x000f0000);
+	memcpy(p, bios_rom, bios_rom_size);
+
+    e820_setup(kvm);
+
+    setup_vga_rom(kvm);
+
+    address = 0x000f0030;
+    intr_desc = (struct real_intr_desc) {
+        .segment = 0x000f0000 >> 4,
+        .offset  = address - 0x000f0000,
+    };
+
+    interrupt_table__setup(&kvm->interrupt_table, &intr_desc);
+    
+    p = guest_flat_to_host(kvm, 0);
+    interrupt_table__copy(&kvm->interrupt_table, p, 1024);
+
+    return ret;
+}
+
 int main(int argc, char **argv) {
     int ret = 0;
     struct kvm *kvm = malloc(sizeof(struct kvm));
@@ -421,6 +539,10 @@ int main(int argc, char **argv) {
     if (ret < 0)
         goto err_sys_fd;
 
+    ret = kvm__arch_setup_firmware(kvm);
+    if (ret < 0)
+        goto err_sys_fd;
+    
     // init the kvm cpu
     ret = kvm_cpu__init(kvm);
     if (ret < 0)
