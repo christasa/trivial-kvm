@@ -5,25 +5,17 @@ tkvm is a minimal VMM which can run a very simple VM and can run a whole operati
 Learning of tkvm can be divided into 4 steps:
 - [x] Build a prototype of KVM API usage
 - [x] Accomplish the part of Memory set
-- [ ] Accomplish the part of load kernel boot and initrd
-- [ ] Accomplish the part of CPU
+- [x] Accomplish the part of load kernel boot and initrd
+- [x] Accomplish the part of CPU
 
 ## Example
 Run the `tkvm` and then run the command
-> `` pidstat -p `pidof tkvm` 1 ``
+> ``./tkvm``
 
-you will see the following output
 
-```bash
- UID       PID    %usr %system  %guest   %wait    %CPU   CPU  Command
-  0    126933    0.00    0.00  100.00    0.00  100.00     0  tkvm
-  0    126933    0.00    0.00  100.00    0.00   99.00     0  tkvm
-  0    126933    0.00    0.00   96.00    0.00   96.00     0  tkvm
-  0    126933    1.00    0.00   98.00    0.00   99.00     0  tkvm
-  0    126933    0.00    0.00  100.00    0.00  100.00     0  tkvm
-```
+![tkvm_terminal](https://github.com/christasa/trivial-kvm/assets/35037256/b999fbf1-512f-4896-9c07-6875b39d6270)
 
-We simply ran an empty loop in the Guest, which can see in the [guest/kernel.S](guest/kernel.S), and it can be observed that the VCPU's Guest state is 100%, even when there are passive VM exits such as clock interrupt or network card interrupt landing on this CPU. After the VM exit, the VCPU stays in Host kernel state for a very short period of time before immediately switching back to the Guest. Therefore, the %system state in the statistics is 0.
+You may need to re-run the programme many time for successfully get the terminal. Only for x86 structure yet.
 
 ## Relevant notes
 - [kvmtool阅读笔记(一) | 通用结构体&函数执行概括](https://christa.top/details/62/)

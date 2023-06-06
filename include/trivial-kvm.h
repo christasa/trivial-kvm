@@ -1,21 +1,43 @@
-#include <pthread.h>
+#include "types.h"
+
+#include <linux/kvm.h>
 
 #define KVM_API_VERSION 12
 #define KVM_32BIT_MAX_MEM_SIZE (1ULL << 32)
 #define KVM_32BIT_GAP_SIZE (768 << 20)
 #define KVM_32BIT_GAP_START (KVM_32BIT_MAX_MEM_SIZE - KVM_32BIT_GAP_SIZE)
 
-typedef unsigned char  u8;
-typedef unsigned short u16;
-typedef unsigned int   u32;
-typedef unsigned long long u64;
+#define BIOS_IRQ_PA_ADDR(name)	(0x000f0000 + BIOS_OFFSET__##name)
+#define BIOS_IRQ_FUNC(name)	((char *)&bios_rom[BIOS_OFFSET__##name])
+#define BIOS_IRQ_SIZE(name)	(BIOS_ENTRY_SIZE(BIOS_OFFSET__##name))
 
-static char kern_cmdline[2048] = "noapic noacpi pci=conf1 reboot=k panic=1 i8042.direct=1 i8042.dumbkbd=1 i8042.nopnp=1 earlyprintk=serial i8042.noaux=1 console=ttyS0 root=/dev/vda rw";
+#define DEFINE_BIOS_IRQ_HANDLER(_irq, _handler)			\
+	{							\
+		.irq		= _irq,				\
+		.address	= BIOS_IRQ_PA_ADDR(_handler),	\
+		.handler	= BIOS_IRQ_FUNC(_handler),	\
+		.size		= BIOS_IRQ_SIZE(_handler),	\
+	}
 
-char bios_rom[0];
-char bios_rom_end[0];
+static char kern_cmdline[2048] = "noapic noacpi pci=conf1 reboot=k panic=1 i8042.direct=1 i8042.dumbkbd=1 i8042.nopnp=1 earlyprintk=serial i8042.noaux=1 console=ttyS0 root=/dev/vda rw ";
+
+#ifndef BIOS_EXPORT_H_
+#define BIOS_EXPORT_H_
+
+extern char bios_rom[0];
+extern char bios_rom_end[0];
 
 #define bios_rom_size		(bios_rom_end - bios_rom)
+
+#endif /* BIOS_EXPORT_H_ */
+
+static inline void kvm__set_thread_name(const char *name) {
+	prctl(15, name);
+}
+
+void kvm__arch_read_term(struct kvm *kvm) {
+	serial8250__update_consoles(kvm);
+}
 
 
 struct list_head {
@@ -86,5 +108,12 @@ struct kvm_cpu {
 	int			vcpu_fd;	/* For VCPU ioctls() */
     struct kvm_run		*kvm_run;
 
+    struct kvm_regs  regs;
+    struct kvm_sregs sregs;
+
 };
 
+static struct irq_handler bios_irq_handlers[] = {
+	DEFINE_BIOS_IRQ_HANDLER(0x10, bios_int10),
+	DEFINE_BIOS_IRQ_HANDLER(0x15, bios_int15),
+};

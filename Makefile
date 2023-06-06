@@ -2,7 +2,8 @@ CC := gcc
 
 CFLAGS := -w -pthread
 
-OBJ += trivial-kvm.c
+OBJS += rbtree.o
+OBJS += bios-rom.o
 
 INCLUDE := include
 
@@ -10,8 +11,8 @@ PROGRAM := tkvm
 
 all: $(PROGRAM)
 
-$(PROGRAM): $(OBJ)
-	$(CC) -I$(INCLUDE) $(CFLAGS) $^ -o $@
+$(PROGRAM): trivial-kvm.c
+	$(CC) -I$(INCLUDE) $(CFLAGS) $^ $(OBJS) -o $@
 
 .PHONY: clean
 clean:
