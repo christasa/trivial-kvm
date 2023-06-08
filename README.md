@@ -10,12 +10,17 @@ Learning of tkvm can be divided into 4 steps:
 
 ## Example
 Run the `tkvm` and then run the command
-> ``./tkvm``
-
+> ``./tkvm -kernel image/bzImage -initrd image/initramfs-busybox-x86.cpio.gz``
 
 ![tkvm_terminal](https://github.com/christasa/trivial-kvm/assets/35037256/b999fbf1-512f-4896-9c07-6875b39d6270)
 
-You may need to re-run the programme many time for successfully get the terminal. Only for x86 structure yet.
+**Build your own Linux image**
+- [https://mgalgs.io/2015/05/16/how-to-build-a-custom-linux-kernel-for-qemu-2015-edition.html](https://mgalgs.io/2015/05/16/how-to-build-a-custom-linux-kernel-for-qemu-2015-edition.html)
+
+Notice: If you need to build the KVM acceleration kernel, change the command `make kvmconfig` to `make kvm_guest.config`. Reference: [https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2140886.html](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2140886.html)
+
+
+*You may need to re-run the programme many time for successfully get the terminal. Only for x86 structure yet.*
 
 ## Relevant notes
 - [kvmtool阅读笔记(一) | 通用结构体&函数执行概括](https://christa.top/details/62/)

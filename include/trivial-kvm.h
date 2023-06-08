@@ -82,6 +82,8 @@ struct interrupt_table {
 struct kvm {
     int sys_fd;      /* For system ioctls(), i.e. /dev/kvm */
     int vm_fd;       /* For VM ioctls() */
+	char *kernel_filename;    /* Filename of kernel**/
+	char *initrd_filename;
 
     u32 ram_slots;    /* for KVM_SET_USER_MEMORY_REGION */
     u64 ram_size;		/* Guest memory size, in bytes */

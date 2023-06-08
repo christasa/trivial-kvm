@@ -719,8 +719,7 @@ static inline void *guest_real_to_host(struct kvm *kvm, u16 selector, u16 offset
     return guest_flat_to_host(kvm, flat);
 }
 
-int kvm__load_kernel(struct kvm *kvm, const char *kernel_filename,
-                     const char *initrd_filename) {
+int kvm__load_kernel(struct kvm *kvm) {
 
     int ret = 0;
     int fd_kernel = -1, fd_initrd = -1;
@@ -731,15 +730,15 @@ int kvm__load_kernel(struct kvm *kvm, const char *kernel_filename,
     ssize_t file_size;
     void *p;
 
-    fd_kernel = open(kernel_filename, O_RDONLY);
+    fd_kernel = open(kvm->kernel_filename, O_RDONLY);
     if (fd_kernel < 0) {
-        printf("Unable to open kernel %s\n", kernel_filename);
+        printf("Unable to open kernel %s\n", kvm->kernel_filename);
         return -1;
     }
 
-    fd_initrd = open(initrd_filename, O_RDONLY);
+    fd_initrd = open(kvm->initrd_filename, O_RDONLY);
     if (fd_initrd < 0) {
-        printf("Unable to open initrd %s\n", initrd_filename);
+        printf("Unable to open initrd %s\n", kvm->initrd_filename);
         return -1;
     }
     
@@ -974,6 +973,35 @@ int kbd__init(struct kvm *kvm)
 	return 0;
 }
 
+int handle__command(int argc, char **argv, struct kvm *kvm) {
+	char *kernel = NULL;
+    char *initrd = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-kernel") == 0) {
+            // Check if the next argument exists
+            if (i + 1 < argc) {
+                kernel = argv[i + 1];
+            }
+        } else if (strcmp(argv[i], "-initrd") == 0) {
+            // Check if the next argument exists
+            if (i + 1 < argc) {
+                initrd = argv[i + 1];
+            }
+        }
+    }
+
+	if (!kernel || !initrd) {
+		printf("Please specify the files of kernel and initrd\n");
+		return -1;
+	}
+
+	kvm->kernel_filename = kernel;
+	kvm->initrd_filename = initrd;
+
+	return 0;
+}
+
 int main(int argc, char **argv) {
     int ret = 0;
     struct kvm *kvm = malloc(sizeof(struct kvm));
@@ -996,6 +1024,10 @@ int main(int argc, char **argv) {
         goto err_sys_fd;
     }
 
+	ret = handle__command(argc, argv, kvm);
+	if (ret < 0)
+		goto err_sys_fd;
+
     kvm->vm_fd = ioctl(kvm->sys_fd, KVM_CREATE_VM, 0);
     if (kvm->vm_fd < -1)
     {
@@ -1010,7 +1042,7 @@ int main(int argc, char **argv) {
         goto err_sys_fd;
 
     // load the kernel
-    ret = kvm__load_kernel(kvm, "./image/bzImage", "./image/initramfs-busybox-x86.cpio.gz");
+    ret = kvm__load_kernel(kvm);
     if (ret < 0)
         goto err_sys_fd;
 
