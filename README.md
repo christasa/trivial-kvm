@@ -25,6 +25,7 @@ Notice: If you need to build the KVM acceleration kernel, change the command `ma
 ## Relevant notes
 - [kvmtool阅读笔记(一) | 通用结构体&函数执行概括](https://christa.top/details/62/)
 - [kvmtool阅读笔记(二) | 内存初始化](https://christa.top/details/63/)
+- [kvmtool阅读笔记(三) | Linux内核加载](https://christa.top/details/64/)
 
 ## Reference
 - [https://github.com/kvmtool/kvmtool](https://github.com/kvmtool/kvmtool)
