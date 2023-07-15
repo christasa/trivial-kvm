@@ -631,6 +631,7 @@ void kvm__arch_init(struct kvm *kvm) {
     if (kvm->ram_start == MAP_FAILED)
         perror("out of memory");
 
+    // Create virtual interrupt chip
     ret = ioctl(kvm->vm_fd, KVM_CREATE_IRQCHIP);
     if (ret < 0)
         perror("KVM_CREATE_IRQCHIP ioctl");
@@ -754,7 +755,7 @@ int kvm__load_kernel(struct kvm *kvm) {
     if (!boot.hdr.setup_sects)
         boot.hdr.setup_sects = 4;
     file_size = (boot.hdr.setup_sects + 1) << 9;
-    p = guest_real_to_host(kvm, 0x1000, 0x0000);
+    p = guest_real_to_host(kvm, 0x1000, 0x00);
     if (read_in_full(fd_kernel, p, file_size) != file_size)
         perror("kernel setup read");
 
@@ -839,22 +840,28 @@ static void e820_setup(struct kvm *kvm) {
     e820 = guest_flat_to_host(kvm, 0x0009fc00);
     mem_map = e820->map;
 
+    // Storing the IVT in real mode
     mem_map[i++]	= (struct e820entry) {
 		.addr		= 0x00000000,
 		.size		= 0x0009fc00,
 		.type		= 1,
 	};
+
+    // Traditional bottom segment memory
 	mem_map[i++]	= (struct e820entry) {
 		.addr		= 0x0009fc00,
 		.size		= 0x00000400,
 		.type		= 2,
 	};
+
+    // BIOS
 	mem_map[i++]	= (struct e820entry) {
 		.addr		= 0x000f0000,
 		.size		= 0x0000ffff,
 		.type		= 2,
 	};
     
+    // Extended memory - usage memory
     if (kvm->ram_size < KVM_32BIT_GAP_START) {
 		mem_map[i++]	= (struct e820entry) {
 			.addr		= 0x100000UL,
@@ -920,6 +927,33 @@ void kvm__setup_bios(struct kvm *kvm) {
     unsigned long address = 0x000f0000;
     struct real_intr_desc intr_desc;
 	void *p;
+/*
+0xFFFFFFFF  ------------------------- 4 G
+           |                         |
+           |          ....           |
+            ------------------------- 16 G
+           |                         |
+           |          ....           |
+  0x100000  ------------------------- 1 M
+           |     ROM BIOS Sector     |
+   0xF0000  -------------------------
+           |    Others BIOS Sector   |
+   0xE0000  -------------------------
+           |   Memory of Other ROM   |   
+   0xC7FFF  -------------------------       
+           |      VGA ROM BIOS       |   
+   0xC0000  ------------------------- 768 K
+       	   |      Display Buffer     |
+   0xA0000  ------------------------- 640 K
+           |                         |
+           |          ....           |
+   0x00500  ------------------------- 
+           |        BIOS Data        |
+   0x00400  -------------------------   
+           |            IVT          |
+   0x00000  ------------------------- 0             
+
+*/
 
     p = guest_flat_to_host(kvm, 0x00000400);
 	memset(p, 0, 0x000000ff);
@@ -951,6 +985,7 @@ void kvm__setup_bios(struct kvm *kvm) {
     for (int i = 0; i < 2; i++)
         setup_irq_handler(kvm, &bios_irq_handlers[i]);
     
+    // The IVT stores in 0 of physical address
     p = guest_flat_to_host(kvm, 0);
     interrupt_table__copy(&kvm->interrupt_table, p, 1024);
 }
