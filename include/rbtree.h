@@ -34,14 +34,14 @@
 #include <stddef.h>
 
 struct rb_node {
-	unsigned long  __rb_parent_color;
-	struct rb_node *rb_right;
-	struct rb_node *rb_left;
+  unsigned long  __rb_parent_color;
+  struct rb_node *rb_right;
+  struct rb_node *rb_left;
 } __attribute__((aligned(sizeof(long))));
     /* The alignment might seem pointless, but allegedly CRIS needs it */
 
 struct rb_root {
-	struct rb_node *rb_node;
+  struct rb_node *rb_node;
 };
 
 
@@ -54,9 +54,9 @@ struct rb_root {
 
 /* 'empty' nodes are nodes that are known not to be inserted in an rbtree */
 #define RB_EMPTY_NODE(node)  \
-	((node)->__rb_parent_color == (unsigned long)(node))
+  ((node)->__rb_parent_color == (unsigned long)(node))
 #define RB_CLEAR_NODE(node)  \
-	((node)->__rb_parent_color = (unsigned long)(node))
+  ((node)->__rb_parent_color = (unsigned long)(node))
 
 
 extern void rb_insert_color(struct rb_node *, struct rb_root *);
@@ -75,21 +75,21 @@ extern struct rb_node *rb_next_postorder(const struct rb_node *);
 
 /* Fast replacement of a single node without remove/rebalance/add/rebalance */
 extern void rb_replace_node(struct rb_node *victim, struct rb_node *new, 
-			    struct rb_root *root);
+          struct rb_root *root);
 
 static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
-				struct rb_node ** rb_link)
+        struct rb_node ** rb_link)
 {
-	node->__rb_parent_color = (unsigned long)parent;
-	node->rb_left = node->rb_right = NULL;
+  node->__rb_parent_color = (unsigned long)parent;
+  node->rb_left = node->rb_right = NULL;
 
-	*rb_link = node;
+  *rb_link = node;
 }
 
 #define rb_entry_safe(ptr, type, member) \
-	({ typeof(ptr) ____ptr = (ptr); \
-	   ____ptr ? rb_entry(____ptr, type, member) : NULL; \
-	})
+  ({ typeof(ptr) ____ptr = (ptr); \
+     ____ptr ? rb_entry(____ptr, type, member) : NULL; \
+  })
 
 /**
  * rbtree_postorder_for_each_entry_safe - iterate over rb_root in post order of
@@ -101,9 +101,9 @@ static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
  * @field:	the name of the rb_node field within 'type'.
  */
 #define rbtree_postorder_for_each_entry_safe(pos, n, root, field) \
-	for (pos = rb_entry_safe(rb_first_postorder(root), typeof(*pos), field); \
-	     pos && ({ n = rb_entry_safe(rb_next_postorder(&pos->field), \
-			typeof(*pos), field); 1; }); \
-	     pos = n)
+  for (pos = rb_entry_safe(rb_first_postorder(root), typeof(*pos), field); \
+       pos && ({ n = rb_entry_safe(rb_next_postorder(&pos->field), \
+      typeof(*pos), field); 1; }); \
+       pos = n)
 
 #endif	/* _LINUX_RBTREE_H */

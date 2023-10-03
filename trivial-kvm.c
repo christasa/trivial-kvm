@@ -33,12 +33,12 @@ struct kvm_cpu *kvm_cpu__arch_init(struct kvm *kvm, unsigned long cpu_id) {
         perror("KVM_CREATE_VCPU ioctl");
     
     mmap_size = ioctl(vcpu->kvm->sys_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
-	if (mmap_size < 0)
-		perror("KVM_GET_VCPU_MMAP_SIZE ioctl");
+    if (mmap_size < 0)
+        perror("KVM_GET_VCPU_MMAP_SIZE ioctl");
     
     vcpu->kvm_run = mmap(NULL, mmap_size, PROT_READ|PROT_WRITE, MAP_SHARED, vcpu->vcpu_fd, 0);
-	if (vcpu->kvm_run == MAP_FAILED)
-		perror("unable to mmap vcpu fd");
+    if (vcpu->kvm_run == MAP_FAILED)
+        perror("unable to mmap vcpu fd");
     
 
     return vcpu;
@@ -75,201 +75,201 @@ fail_alloc:
 }
 
 void filter_cpuid(struct kvm_cpuid2 *kvm_cpuid, int cpu_id) {
-	unsigned int i;
+    unsigned int i;
 
-	for (i = 0; i < kvm_cpuid->nent; i++) {
-		struct kvm_cpuid_entry2 *entry = &kvm_cpuid->entries[i];
+    for (i = 0; i < kvm_cpuid->nent; i++) {
+        struct kvm_cpuid_entry2 *entry = &kvm_cpuid->entries[i];
 
-		switch (entry->function) {
-		case 1:
-			entry->ebx &= ~(0xff << 24);
-			entry->ebx |= cpu_id << 24;
-			/* Set X86_FEATURE_HYPERVISOR */
-			if (entry->index == 0)
-				entry->ecx |= (1 << 31);
-			break;
-		case 6:
-			entry->ecx = entry->ecx & ~(1 << 3);
-			break;
-		case 10: { /* Architectural Performance Monitoring */
-			union cpuid10_eax {
-				struct {
-					unsigned int version_id		:8;
-					unsigned int num_counters	:8;
-					unsigned int bit_width		:8;
-					unsigned int mask_length	:8;
-				} split;
-				unsigned int full;
-			} eax;
+        switch (entry->function) {
+        case 1:
+            entry->ebx &= ~(0xff << 24);
+            entry->ebx |= cpu_id << 24;
+            /* Set X86_FEATURE_HYPERVISOR */
+            if (entry->index == 0)
+                entry->ecx |= (1 << 31);
+            break;
+        case 6:
+            entry->ecx = entry->ecx & ~(1 << 3);
+            break;
+        case 10: { /* Architectural Performance Monitoring */
+            union cpuid10_eax {
+                struct {
+                    unsigned int version_id		:8;
+                    unsigned int num_counters	:8;
+                    unsigned int bit_width		:8;
+                    unsigned int mask_length	:8;
+                } split;
+                unsigned int full;
+            } eax;
 
-			if (entry->eax) {
-				eax.full = entry->eax;
-				if (eax.split.version_id != 2 ||
-				    !eax.split.num_counters)
-					entry->eax = 0;
-			}
-			break;
-		}
-		default:
-			break;
-		};
-	}
+            if (entry->eax) {
+                eax.full = entry->eax;
+                if (eax.split.version_id != 2 ||
+                    !eax.split.num_counters)
+                    entry->eax = 0;
+            }
+            break;
+        }
+        default:
+            break;
+        };
+    }
 }
 
 void kvm_cpu__setup_cpuid(struct kvm_cpu *vcpu) {
-	struct kvm_cpuid2 *kvm_cpuid;
+    struct kvm_cpuid2 *kvm_cpuid;
 
-	kvm_cpuid = calloc(1, sizeof(*kvm_cpuid) +
-				100 * sizeof(*kvm_cpuid->entries));
+    kvm_cpuid = calloc(1, sizeof(*kvm_cpuid) +
+                100 * sizeof(*kvm_cpuid->entries));
 
-	kvm_cpuid->nent = 100;
-	if (ioctl(vcpu->kvm->sys_fd, KVM_GET_SUPPORTED_CPUID, kvm_cpuid) < 0)
-		perror("KVM_GET_SUPPORTED_CPUID failed");
+    kvm_cpuid->nent = 100;
+    if (ioctl(vcpu->kvm->sys_fd, KVM_GET_SUPPORTED_CPUID, kvm_cpuid) < 0)
+        perror("KVM_GET_SUPPORTED_CPUID failed");
 
-	filter_cpuid(kvm_cpuid, vcpu->cpu_id);
+    filter_cpuid(kvm_cpuid, vcpu->cpu_id);
 
-	if (ioctl(vcpu->vcpu_fd, KVM_SET_CPUID2, kvm_cpuid) < 0)
-		perror("KVM_SET_CPUID2 failed");
+    if (ioctl(vcpu->vcpu_fd, KVM_SET_CPUID2, kvm_cpuid) < 0)
+        perror("KVM_SET_CPUID2 failed");
 
-	free(kvm_cpuid);
+    free(kvm_cpuid);
 }
 
 static inline u32 selector_to_base(u16 selector) {
-	return (u32)selector << 4;
+    return (u32)selector << 4;
 }
 
 static void kvm_cpu__setup_sregs(struct kvm_cpu *vcpu) {
-	if (ioctl(vcpu->vcpu_fd, KVM_GET_SREGS, &vcpu->sregs) < 0)
-		perror("KVM_GET_SREGS failed");
+    if (ioctl(vcpu->vcpu_fd, KVM_GET_SREGS, &vcpu->sregs) < 0)
+        perror("KVM_GET_SREGS failed");
 
-	vcpu->sregs.cs.selector	= 0x1000;
-	vcpu->sregs.cs.base	= selector_to_base(0x1000);
-	vcpu->sregs.ss.selector	= 0x1000;
-	vcpu->sregs.ss.base	= selector_to_base(0x1000);
-	vcpu->sregs.ds.selector	= 0x1000;
-	vcpu->sregs.ds.base	= selector_to_base(0x1000);
-	vcpu->sregs.es.selector	= 0x1000;
-	vcpu->sregs.es.base	= selector_to_base(0x1000);
-	vcpu->sregs.fs.selector	= 0x1000;
-	vcpu->sregs.fs.base	= selector_to_base(0x1000);
-	vcpu->sregs.gs.selector	= 0x1000;
-	vcpu->sregs.gs.base	= selector_to_base(0x1000);
+    vcpu->sregs.cs.selector	= 0x1000;
+    vcpu->sregs.cs.base	= selector_to_base(0x1000);
+    vcpu->sregs.ss.selector	= 0x1000;
+    vcpu->sregs.ss.base	= selector_to_base(0x1000);
+    vcpu->sregs.ds.selector	= 0x1000;
+    vcpu->sregs.ds.base	= selector_to_base(0x1000);
+    vcpu->sregs.es.selector	= 0x1000;
+    vcpu->sregs.es.base	= selector_to_base(0x1000);
+    vcpu->sregs.fs.selector	= 0x1000;
+    vcpu->sregs.fs.base	= selector_to_base(0x1000);
+    vcpu->sregs.gs.selector	= 0x1000;
+    vcpu->sregs.gs.base	= selector_to_base(0x1000);
 
-	if (ioctl(vcpu->vcpu_fd, KVM_SET_SREGS, &vcpu->sregs) < 0)
-		perror("KVM_SET_SREGS failed");
+    if (ioctl(vcpu->vcpu_fd, KVM_SET_SREGS, &vcpu->sregs) < 0)
+        perror("KVM_SET_SREGS failed");
 }
 
 static void kvm_cpu__setup_regs(struct kvm_cpu *vcpu) {
-	vcpu->regs = (struct kvm_regs) {
-		/* We start the guest in 16-bit real mode  */
-		.rflags	= 0x0000000000000002ULL,
+    vcpu->regs = (struct kvm_regs) {
+        /* We start the guest in 16-bit real mode  */
+        .rflags	= 0x0000000000000002ULL,
 
-		.rip	= 0x200,
-		.rsp	= 0x8000,
-		.rbp	= 0x8000,
-	};
+        .rip	= 0x200,
+        .rsp	= 0x8000,
+        .rbp	= 0x8000,
+    };
 
-	if (vcpu->regs.rip > USHRT_MAX)
-		printf("ip 0x%llx is too high for real mode\n", (u64)vcpu->regs.rip);
+    if (vcpu->regs.rip > USHRT_MAX)
+        printf("ip 0x%llx is too high for real mode\n", (u64)vcpu->regs.rip);
 
-	if (ioctl(vcpu->vcpu_fd, KVM_SET_REGS, &vcpu->regs) < 0)
-		perror("KVM_SET_REGS failed");
+    if (ioctl(vcpu->vcpu_fd, KVM_SET_REGS, &vcpu->regs) < 0)
+        perror("KVM_SET_REGS failed");
 }
 
 void kvm_cpu__reset_vcpu(struct kvm_cpu *vcpu) {
-	kvm_cpu__setup_cpuid(vcpu);
-	kvm_cpu__setup_sregs(vcpu);
-	kvm_cpu__setup_regs(vcpu);
+    kvm_cpu__setup_cpuid(vcpu);
+    kvm_cpu__setup_sregs(vcpu);
+    kvm_cpu__setup_regs(vcpu);
 }
 
 void kvm__irq_line(struct kvm *kvm, int irq, int level)
 {
-	struct kvm_irq_level irq_level;
+    struct kvm_irq_level irq_level;
 
-	irq_level = (struct kvm_irq_level){
-		{
-			.irq = irq,
-		},
-		.level = level,
-	};
+    irq_level = (struct kvm_irq_level){
+        {
+            .irq = irq,
+        },
+        .level = level,
+    };
 
-	if (ioctl(kvm->vm_fd, KVM_IRQ_LINE, &irq_level) < 0)
-		perror("KVM_IRQ_LINE failed");
+    if (ioctl(kvm->vm_fd, KVM_IRQ_LINE, &irq_level) < 0)
+        perror("KVM_IRQ_LINE failed");
 }
 
 
 struct rb_int_node *rb_int_search_single(struct rb_root *root, u64 point) {
-	struct rb_node *node = root->rb_node;
+    struct rb_node *node = root->rb_node;
 
-	while (node) {
-		struct rb_int_node *cur = rb_int(node);
+    while (node) {
+        struct rb_int_node *cur = rb_int(node);
 
-		if (point < cur->low)
-			node = node->rb_left;
-		else if (cur->high <= point)
-			node = node->rb_right;
-		else
-			return cur;
-	}
+        if (point < cur->low)
+            node = node->rb_left;
+        else if (cur->high <= point)
+            node = node->rb_right;
+        else
+            return cur;
+    }
 
-	return NULL;
+    return NULL;
 }
 
 struct rb_int_node *rb_int_search_range(struct rb_root *root, u64 low, u64 high) {
-	struct rb_int_node *range;
+    struct rb_int_node *range;
 
-	range = rb_int_search_single(root, low);
-	if (range == NULL)
-		return NULL;
+    range = rb_int_search_single(root, low);
+    if (range == NULL)
+        return NULL;
 
-	if (range->high < high)
-		return NULL;
+    if (range->high < high)
+        return NULL;
 
-	return range;
+    return range;
 }
 
 int rb_int_insert(struct rb_root *root, struct rb_int_node *i_node) {
-	struct rb_node **node = &root->rb_node, *parent = NULL;
+    struct rb_node **node = &root->rb_node, *parent = NULL;
 
-	while (*node) {
-		struct rb_int_node *cur = rb_int(*node);
+    while (*node) {
+        struct rb_int_node *cur = rb_int(*node);
 
-		parent = *node;
-		if (i_node->high <= cur->low)
-			node = &cur->node.rb_left;
-		else if (cur->high <= i_node->low)
-			node = &cur->node.rb_right;
-		else
-			return -EEXIST;
-	}
+        parent = *node;
+        if (i_node->high <= cur->low)
+            node = &cur->node.rb_left;
+        else if (cur->high <= i_node->low)
+            node = &cur->node.rb_right;
+        else
+            return -EEXIST;
+    }
 
-	rb_link_node(&i_node->node, parent, node);
-	rb_insert_color(&i_node->node, root);
+    rb_link_node(&i_node->node, parent, node);
+    rb_insert_color(&i_node->node, root);
 
-	return 0;
+    return 0;
 }
 
 static struct mmio_mapping *mmio_search(struct rb_root *root, u64 addr, u64 len) {
-	struct rb_int_node *node;
+    struct rb_int_node *node;
 
-	if (addr + len <= addr)
-		return NULL;
+    if (addr + len <= addr)
+        return NULL;
 
-	node = rb_int_search_range(root, addr, addr + len);
-	if (node == NULL)
-		return NULL;
+    node = rb_int_search_range(root, addr, addr + len);
+    if (node == NULL)
+        return NULL;
 
-	return mmio_node(node);
+    return mmio_node(node);
 }
 
 static struct mmio_mapping *mmio_search_single(struct rb_root *root, u64 addr) {
-	struct rb_int_node *node;
+    struct rb_int_node *node;
 
-	node = rb_int_search_single(root, addr);
-	if (node == NULL)
-		return NULL;
+    node = rb_int_search_single(root, addr);
+    if (node == NULL)
+        return NULL;
 
-	return mmio_node(node);
+    return mmio_node(node);
 }
 
 static void mmio_remove(struct rb_root *root, struct mmio_mapping *data) {
@@ -278,165 +278,166 @@ static void mmio_remove(struct rb_root *root, struct mmio_mapping *data) {
 
 
 static void mmio_deregister(struct kvm *kvm, struct rb_root *root, struct mmio_mapping *mmio) {
-	struct kvm_coalesced_mmio_zone zone = (struct kvm_coalesced_mmio_zone) {
-		.addr	= rb_int_start(&mmio->node),
-		.size	= 1,
-	};
-	ioctl(kvm->vm_fd, KVM_UNREGISTER_COALESCED_MMIO, &zone);
+    struct kvm_coalesced_mmio_zone zone = (struct kvm_coalesced_mmio_zone) {
+        .addr	= rb_int_start(&mmio->node),
+        .size	= 1,
+    };
+    ioctl(kvm->vm_fd, KVM_UNREGISTER_COALESCED_MMIO, &zone);
 
-	mmio_remove(root, mmio);
-	free(mmio);
+    mmio_remove(root, mmio);
+    free(mmio);
 }
 
 static int mmio_insert(struct rb_root *root, struct mmio_mapping *data) {
-	return rb_int_insert(root, &data->node);
+    return rb_int_insert(root, &data->node);
 }
 
 static struct mmio_mapping *mmio_get(struct rb_root *root, u64 phys_addr, u32 len) {
-	struct mmio_mapping *mmio;
+    struct mmio_mapping *mmio;
 
-	pthread_mutex_lock(&mmio_lock);
-	mmio = mmio_search(root, phys_addr, len);
-	if (mmio)
-		mmio->refcount++;
-	pthread_mutex_unlock(&mmio_lock);
+    pthread_mutex_lock(&mmio_lock);
+    mmio = mmio_search(root, phys_addr, len);
+    if (mmio)
+        mmio->refcount++;
+    pthread_mutex_unlock(&mmio_lock);
 
-	return mmio;
+    return mmio;
 }
 
 static void mmio_put(struct kvm *kvm, struct rb_root *root, struct mmio_mapping *mmio)
 {
-	pthread_mutex_lock(&mmio_lock);
-	mmio->refcount--;
-	if (mmio->remove && mmio->refcount == 0)
-		mmio_deregister(kvm, root, mmio);
-	pthread_mutex_unlock(&mmio_lock);
+    pthread_mutex_lock(&mmio_lock);
+    mmio->refcount--;
+    if (mmio->remove && mmio->refcount == 0)
+        mmio_deregister(kvm, root, mmio);
+    pthread_mutex_unlock(&mmio_lock);
 }
 
 static int trap_is_mmio(unsigned int flags) {
-	return (flags & 0xf) == DEVICE_BUS_MMIO;
+    return (flags & 0xf) == DEVICE_BUS_MMIO;
 }
 
 int kvm__register_iotrap(struct kvm *kvm, u64 phys_addr, u64 phys_addr_len,
-			 mmio_handler_fn mmio_fn, void *ptr,
-			 unsigned int flags) {
-	struct mmio_mapping *mmio;
-	int ret;
+             mmio_handler_fn mmio_fn, void *ptr,
+             unsigned int flags) {
+    struct mmio_mapping *mmio;
+    int ret;
 
-	mmio = malloc(sizeof(*mmio));
-	if (mmio == NULL)
-		return -ENOMEM;
+    mmio = malloc(sizeof(*mmio));
+    if (mmio == NULL)
+        return -ENOMEM;
 
-	*mmio = (struct mmio_mapping) {
-		.node		= RB_INT_INIT(phys_addr, phys_addr + phys_addr_len),
-		.mmio_fn	= mmio_fn,
-		.ptr		= ptr,
-		/*
-		 * Start from 0 because kvm__deregister_mmio() doesn't decrement
-		 * the reference count.
-		 */
-		.refcount	= 0,
-		.remove		= 0,
-	};
+    *mmio = (struct mmio_mapping) {
+        .node		= RB_INT_INIT(phys_addr, phys_addr + phys_addr_len),
+        .mmio_fn	= mmio_fn,
+        .ptr		= ptr,
+        /*
+         * Start from 0 because kvm__deregister_mmio() doesn't decrement
+         * the reference count.
+         */
+        .refcount	= 0,
+        .remove		= 0,
+    };
 
-	pthread_mutex_lock(&mmio_lock);
-	ret = mmio_insert(&pio_tree, mmio);
-	pthread_mutex_unlock(&mmio_lock);
+    pthread_mutex_lock(&mmio_lock);
+    ret = mmio_insert(&pio_tree, mmio);
+    pthread_mutex_unlock(&mmio_lock);
 
-	return ret;
+    return ret;
 }
 
 int kvm__deregister_iotrap(struct kvm *kvm, u64 phys_addr, unsigned int flags) {
-	struct mmio_mapping *mmio;
-	struct rb_root *tree;
+    struct mmio_mapping *mmio;
+    struct rb_root *tree;
 
-	tree = &pio_tree;
+    tree = &pio_tree;
 
-	pthread_mutex_lock(&mmio_lock);
-	mmio = mmio_search_single(tree, phys_addr);
-	if (mmio == NULL) {
-		pthread_mutex_unlock(&mmio_lock);
-		return 0;
-	}
+    pthread_mutex_lock(&mmio_lock);
+    mmio = mmio_search_single(tree, phys_addr);
+    if (mmio == NULL) {
+        pthread_mutex_unlock(&mmio_lock);
+        return 0;
+    }
 
-	if (mmio->refcount == 0)
-		mmio_deregister(kvm, tree, mmio);
-	else
-		mmio->remove = 1;
-	pthread_mutex_unlock(&mmio_lock);
+    if (mmio->refcount == 0)
+        mmio_deregister(kvm, tree, mmio);
+    else
+        mmio->remove = 1;
+    pthread_mutex_unlock(&mmio_lock);
 
-	return 1;
+    return 1;
 }
 
 void serial8250__update_consoles(struct kvm *kvm)
 {
-	unsigned int i;
+    unsigned int i;
 
-	for (i = 0; i < 4; i++) {
-		struct serial8250_device *dev = &devices[i];
+    for (i = 0; i < 4; i++) {
+        struct serial8250_device *dev = &devices[i];
 
-		pthread_mutex_lock(&dev->mutex);
+        pthread_mutex_lock(&dev->mutex);
 
-		/* Restrict sysrq injection to the first port */
-		serial8250__receive(kvm, dev, i == 0);
+        /* Restrict sysrq injection to the first port */
+        serial8250__receive(kvm, dev, i == 0);
 
-		serial8250_update_irq(kvm, dev);
+        serial8250_update_irq(kvm, dev);
 
-		pthread_mutex_unlock(&dev->mutex);
-	}
+        pthread_mutex_unlock(&dev->mutex);
+    }
 }
 
 int serial8250__init(struct kvm *kvm) {
-	unsigned int i, j;
-	int r = 0;
+    unsigned int i, j;
+    int r = 0;
 
-	for (i = 0; i < 4; i++) {
-		struct serial8250_device *dev = &devices[i];
+    for (i = 0; i < 4; i++) {
+        struct serial8250_device *dev = &devices[i];
 
-		r = kvm__register_iotrap(kvm, dev->iobase, 8, serial8250_mmio, dev,
-				 SERIAL8250_BUS_TYPE);
-		if (r < 0)
-			break;
-	}
+        r = kvm__register_iotrap(kvm, dev->iobase, 8, serial8250_mmio, dev,
+                 SERIAL8250_BUS_TYPE);
+        if (r < 0)
+            break;
+    }
 
-	return r;
+    return r;
 }
 
 int term_init(struct kvm *kvm)
 {
-	struct termios term;
-	int i, r;
+    struct termios term;
+    int i, r;
 
-	for (i = 0; i < 4; i++)
-		if (term_fds[i][0] == 0) {
-			term_fds[i][0] = STDIN_FILENO;
-			term_fds[i][1] = STDOUT_FILENO;
-		}
+    for (i = 0; i < 4; i++)
+        if (term_fds[i][0] == 0) {
+            term_fds[i][0] = STDIN_FILENO;
+            term_fds[i][1] = STDOUT_FILENO;
+        }
 
-	if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO))
-		return 0;
+    if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO))
+        return 0;
 
-	r = tcgetattr(STDIN_FILENO, &orig_term);
-	if (r < 0) {
-		printf("unable to save initial standard input settings\n");
-		return r;
-	}
-
-
-	term = orig_term;
-	term.c_iflag &= ~(ICRNL);
-	term.c_lflag &= ~(ICANON | ECHO | ISIG);
-	tcsetattr(STDIN_FILENO, TCSANOW, &term);
+    r = tcgetattr(STDIN_FILENO, &orig_term);
+    if (r < 0) {
+        printf("unable to save initial standard input settings\n");
+        return r;
+    }
 
 
-	/* Use our own blocking thread to read stdin, don't require a tick */
-	if(pthread_create(&term_poll_thread, NULL, term_poll_thread_loop, kvm))
-		perror("Unable to create console input poll thread\n");
+    term = orig_term;
+    term.c_iflag &= ~(ICRNL);
+    term.c_lflag &= ~(ICANON | ECHO | ISIG);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);
 
-	signal(SIGTERM, term_sig_cleanup);
-	atexit(term_cleanup);
 
-	return 0;
+    /* Use our own blocking thread to read stdin, don't require a tick */
+    // Keep receive the input of terminal, and ouput the result into the stdout
+    if(pthread_create(&term_poll_thread, NULL, term_poll_thread_loop, kvm))
+        perror("Unable to create console input poll thread\n");
+
+    signal(SIGTERM, term_sig_cleanup);
+    atexit(term_cleanup);
+
+    return 0;
 }
 
 static inline int kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *data, 
@@ -477,20 +478,20 @@ int kvm_cpu__start(struct kvm_cpu *cpu) {
         if (err < 0)
             perror("KVM_RUN ioctl");
         
-		// printf("switch kvm run exit reason: %d\n", cpu->kvm_run->exit_reason);
+        // printf("switch kvm run exit reason: %d\n", cpu->kvm_run->exit_reason);
         switch (cpu->kvm_run->exit_reason) {
         case KVM_EXIT_UNKNOWN:
-			break;
+            break;
         case KVM_EXIT_IO: {
             int ret;
 
             ret = kvm_cpu__emulate_io(cpu,
-						  cpu->kvm_run->io.port,
-						  (u8 *)cpu->kvm_run +
-						  cpu->kvm_run->io.data_offset,
-						  cpu->kvm_run->io.direction,
-						  cpu->kvm_run->io.size,
-						  cpu->kvm_run->io.count); 
+                          cpu->kvm_run->io.port,
+                          (u8 *)cpu->kvm_run +
+                          cpu->kvm_run->io.data_offset,
+                          cpu->kvm_run->io.direction,
+                          cpu->kvm_run->io.size,
+                          cpu->kvm_run->io.count); 
             if (!ret) {
                 err = 1;
                 goto panic_kvm;
@@ -509,54 +510,54 @@ int kvm_cpu__start(struct kvm_cpu *cpu) {
     }
 
 panic_kvm:
-	return err;
+    return err;
 
 }
 
 static u64 host_ram_size(void) {
-	long page_size;
-	long nr_pages;
+    long page_size;
+    long nr_pages;
 
-	nr_pages	= sysconf(_SC_PHYS_PAGES);
-	if (nr_pages < 0) {
-		printf("sysconf(_SC_PHYS_PAGES) failed\n");
-		return 0;
-	}
+    nr_pages	= sysconf(_SC_PHYS_PAGES);
+    if (nr_pages < 0) {
+        printf("sysconf(_SC_PHYS_PAGES) failed\n");
+        return 0;
+    }
 
-	page_size	= sysconf(_SC_PAGE_SIZE);
-	if (page_size < 0) {
-		printf("sysconf(_SC_PAGE_SIZE) failed\n");
-		return 0;
-	}
+    page_size	= sysconf(_SC_PAGE_SIZE);
+    if (page_size < 0) {
+        printf("sysconf(_SC_PAGE_SIZE) failed\n");
+        return 0;
+    }
 
-	return (u64)nr_pages * page_size;
+    return (u64)nr_pages * page_size;
 }
 
 static u64 get_ram_size(int nr_cpus) {
-	u64 available;
-	u64 ram_size;
+    u64 available;
+    u64 ram_size;
 
-	ram_size	= (u64)0x04000000 * (nr_cpus + 3);
+    ram_size	= (u64)0x04000000 * (nr_cpus + 3);
 
-	available	= host_ram_size() * 0.8;
-	if (!available)
-		available = 0x04000000; // set the default size as 64MB
+    available	= host_ram_size() * 0.8;
+    if (!available)
+        available = 0x04000000; // set the default size as 64MB
 
-	if (ram_size > available)
-		ram_size	= available;
+    if (ram_size > available)
+        ram_size	= available;
 
-	return ram_size;
+    return ram_size;
 }
 
 ssize_t xread(int fd, void *buf, size_t count) {
-	ssize_t nr;
+    ssize_t nr;
 
 restart:
-	nr = read(fd, buf, count);
-	if ((nr < 0) && ((errno == EAGAIN) || (errno == EINTR)))
-		goto restart;
+    nr = read(fd, buf, count);
+    if ((nr < 0) && ((errno == EAGAIN) || (errno == EINTR)))
+        goto restart;
 
-	return nr;
+    return nr;
 }
 
 ssize_t read_in_full(int fd, void *buf, size_t count) {
@@ -817,69 +818,69 @@ int kvm__load_kernel(struct kvm *kvm) {
 }
 
 static void setup_irq_handler(struct kvm *kvm, struct irq_handler *handler) {
-	struct real_intr_desc intr_desc;
-	void *p;
+    struct real_intr_desc intr_desc;
+    void *p;
 
-	p = guest_flat_to_host(kvm, handler->address);
-	memcpy(p, handler->handler, handler->size);
+    p = guest_flat_to_host(kvm, handler->address);
+    memcpy(p, handler->handler, handler->size);
 
-	intr_desc = (struct real_intr_desc) {
-		.segment	= (0x000f0000 >> 4),
-		.offset		= handler->address - 0x000f0000,
-	};
+    intr_desc = (struct real_intr_desc) {
+        .segment	= (0x000f0000 >> 4),
+        .offset		= handler->address - 0x000f0000,
+    };
 
-	interrupt_table__set(&kvm->interrupt_table, &intr_desc, handler->irq);
+    interrupt_table__set(&kvm->interrupt_table, &intr_desc, handler->irq);
 }
 
 
 static void e820_setup(struct kvm *kvm) {
     struct e820map *e820;
-	struct e820entry *mem_map;
-	unsigned int i = 0;
+    struct e820entry *mem_map;
+    unsigned int i = 0;
 
     e820 = guest_flat_to_host(kvm, 0x0009fc00);
     mem_map = e820->map;
 
     // Storing the IVT in real mode
     mem_map[i++]	= (struct e820entry) {
-		.addr		= 0x00000000,
-		.size		= 0x0009fc00,
-		.type		= 1,
-	};
+        .addr		= 0x00000000,
+        .size		= 0x0009fc00,
+        .type		= 1,
+    };
 
     // Traditional bottom segment memory
-	mem_map[i++]	= (struct e820entry) {
-		.addr		= 0x0009fc00,
-		.size		= 0x00000400,
-		.type		= 2,
-	};
+    mem_map[i++]	= (struct e820entry) {
+        .addr		= 0x0009fc00,
+        .size		= 0x00000400,
+        .type		= 2,
+    };
 
     // BIOS
-	mem_map[i++]	= (struct e820entry) {
-		.addr		= 0x000f0000,
-		.size		= 0x0000ffff,
-		.type		= 2,
-	};
+    mem_map[i++]	= (struct e820entry) {
+        .addr		= 0x000f0000,
+        .size		= 0x0000ffff,
+        .type		= 2,
+    };
     
     // Extended memory - usage memory
     if (kvm->ram_size < KVM_32BIT_GAP_START) {
-		mem_map[i++]	= (struct e820entry) {
-			.addr		= 0x100000UL,
-			.size		= kvm->ram_size - 0x100000UL,
-			.type		= 1,
-		};
-	} else {
-		mem_map[i++]	= (struct e820entry) {
-			.addr		= 0x100000UL,
-			.size		= KVM_32BIT_GAP_START - 0x100000UL,
-			.type		= 1,
-		};
-		mem_map[i++]	= (struct e820entry) {
-			.addr		= KVM_32BIT_MAX_MEM_SIZE,
-			.size		= kvm->ram_size - KVM_32BIT_MAX_MEM_SIZE,
-			.type		= 1,
-		};
-	}
+        mem_map[i++]	= (struct e820entry) {
+            .addr		= 0x100000UL,
+            .size		= kvm->ram_size - 0x100000UL,
+            .type		= 1,
+        };
+    } else {
+        mem_map[i++]	= (struct e820entry) {
+            .addr		= 0x100000UL,
+            .size		= KVM_32BIT_GAP_START - 0x100000UL,
+            .type		= 1,
+        };
+        mem_map[i++]	= (struct e820entry) {
+            .addr		= KVM_32BIT_MAX_MEM_SIZE,
+            .size		= kvm->ram_size - KVM_32BIT_MAX_MEM_SIZE,
+            .type		= 1,
+        };
+    }
 
     if (i > 128)
         perror("BUG too big");
@@ -902,31 +903,31 @@ static void setup_vga_rom(struct kvm *kvm) {
 }
 
 void interrupt_table__setup(struct interrupt_table *itable, struct real_intr_desc *entry) {
-	unsigned int i;
+    unsigned int i;
 
-	for (i = 0; i < 256; i++)
-		itable->entries[i] = *entry;
+    for (i = 0; i < 256; i++)
+        itable->entries[i] = *entry;
 }
 
 void interrupt_table__set(struct interrupt_table *itable,
-				struct real_intr_desc *entry, unsigned int num) {
-	if (num < 256)
-		itable->entries[num] = *entry;
+                struct real_intr_desc *entry, unsigned int num) {
+    if (num < 256)
+        itable->entries[num] = *entry;
 }
 
 
 void interrupt_table__copy(struct interrupt_table *itable, void *dst, unsigned int size)
 {
-	if (size < sizeof(itable->entries))
-		perror("An attempt to overwrite host memory");
+    if (size < sizeof(itable->entries))
+        perror("An attempt to overwrite host memory");
 
-	memcpy(dst, itable->entries, sizeof(itable->entries));
+    memcpy(dst, itable->entries, sizeof(itable->entries));
 }
 
 void kvm__setup_bios(struct kvm *kvm) {
     unsigned long address = 0x000f0000;
     struct real_intr_desc intr_desc;
-	void *p;
+    void *p;
 /*
 0xFFFFFFFF  ------------------------- 4 G
            |                         |
@@ -943,7 +944,7 @@ void kvm__setup_bios(struct kvm *kvm) {
    0xC7FFF  -------------------------       
            |      VGA ROM BIOS       |   
    0xC0000  ------------------------- 768 K
-       	   |      Display Buffer     |
+              |      Display Buffer     |
    0xA0000  ------------------------- 640 K
            |                         |
            |          ....           |
@@ -956,19 +957,19 @@ void kvm__setup_bios(struct kvm *kvm) {
 */
 
     p = guest_flat_to_host(kvm, 0x00000400);
-	memset(p, 0, 0x000000ff);
+    memset(p, 0, 0x000000ff);
 
-	p = guest_flat_to_host(kvm, 0x0009fc00);
-	memset(p, 0, 0x000003ff);
+    p = guest_flat_to_host(kvm, 0x0009fc00);
+    memset(p, 0, 0x000003ff);
 
-	p = guest_flat_to_host(kvm, 0x000f0000);
-	memset(p, 0, 0x0000ffff);
+    p = guest_flat_to_host(kvm, 0x000f0000);
+    memset(p, 0, 0x0000ffff);
 
-	p = guest_flat_to_host(kvm, 0x000c0000);
-	memset(p, 0, 0x00007fff);
+    p = guest_flat_to_host(kvm, 0x000c0000);
+    memset(p, 0, 0x00007fff);
 
-	p = guest_flat_to_host(kvm, 0x000f0000);
-	memcpy(p, bios_rom, bios_rom_size);
+    p = guest_flat_to_host(kvm, 0x000f0000);
+    memcpy(p, bios_rom, bios_rom_size);
 
     e820_setup(kvm);
 
@@ -992,24 +993,24 @@ void kvm__setup_bios(struct kvm *kvm) {
 
 int kbd__init(struct kvm *kvm)
 {
-	int r;
+    int r;
 
-	kbd_reset();
-	state.kvm = kvm;
-	r = kvm__register_iotrap(kvm, 0x60, 2, kbd_io, NULL, DEVICE_BUS_IOPORT);
-	if (r < 0)
-		return r;
-	r = kvm__register_iotrap(kvm, 0x64, 2, kbd_io, NULL, DEVICE_BUS_IOPORT);
-	if (r < 0) {
-		kvm__deregister_iotrap(kvm, 0x60, DEVICE_BUS_IOPORT);
-		return r;
-	}
+    kbd_reset();
+    state.kvm = kvm;
+    r = kvm__register_iotrap(kvm, 0x60, 2, kbd_io, NULL, DEVICE_BUS_IOPORT);
+    if (r < 0)
+        return r;
+    r = kvm__register_iotrap(kvm, 0x64, 2, kbd_io, NULL, DEVICE_BUS_IOPORT);
+    if (r < 0) {
+        kvm__deregister_iotrap(kvm, 0x60, DEVICE_BUS_IOPORT);
+        return r;
+    }
 
-	return 0;
+    return 0;
 }
 
 int handle__command(int argc, char **argv, struct kvm *kvm) {
-	char *kernel = NULL;
+    char *kernel = NULL;
     char *initrd = NULL;
 
     for (int i = 1; i < argc; i++) {
@@ -1026,15 +1027,15 @@ int handle__command(int argc, char **argv, struct kvm *kvm) {
         }
     }
 
-	if (!kernel || !initrd) {
-		printf("Please specify the files of kernel and initrd\n");
-		return -1;
-	}
+    if (!kernel || !initrd) {
+        printf("Please specify the files of kernel and initrd\n");
+        return -1;
+    }
 
-	kvm->kernel_filename = kernel;
-	kvm->initrd_filename = initrd;
+    kvm->kernel_filename = kernel;
+    kvm->initrd_filename = initrd;
 
-	return 0;
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -1059,9 +1060,9 @@ int main(int argc, char **argv) {
         goto err_sys_fd;
     }
 
-	ret = handle__command(argc, argv, kvm);
-	if (ret < 0)
-		goto err_sys_fd;
+    ret = handle__command(argc, argv, kvm);
+    if (ret < 0)
+        goto err_sys_fd;
 
     kvm->vm_fd = ioctl(kvm->sys_fd, KVM_CREATE_VM, 0);
     if (kvm->vm_fd < -1)
@@ -1098,15 +1099,15 @@ int main(int argc, char **argv) {
         goto err_sys_fd;
     }
 
-	// init terminal
-	ret = term_init(kvm);
-	if (ret < 0)
-		perror("TERMINAL INIT");
+    // init terminal
+    ret = term_init(kvm);
+    if (ret < 0)
+        perror("TERMINAL INIT");
 
-	// init kbd
-	ret = kbd__init(kvm);
-	if (ret < 0)
-		perror("KBD INIT");
+    // init kbd
+    ret = kbd__init(kvm);
+    if (ret < 0)
+        perror("KBD INIT");
 
     // start the kvm
     for (int i = 0; i < kvm->nrcpus; i++)
